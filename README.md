@@ -24,7 +24,7 @@ We generally do not code software for EOL PHP, but still a lot of providers negl
 2. Double-check the contents of the file and make sure there is no malicious code in it. The risk running this software is all yours.
 3. Let's do a security check first by running: `php whmcs-integrity.php check https://your-whmcs-instance /var/www/path/to/your/whmcs`.
 4. In order to do an integrity check, you must have a WHMCS source folder with the exact same version as your instance. Download it from WHMCS website and unzip it.
-5. Now run the following command to check integrity: `php whmcs-integrity.php check https://your-whmcs-instance /var/www/path/to/your/whmcs /root/whmcs_v880_full/whmcs`.
+5. Now run the following command to check integrity: `php whmcs-integrity.php integrity https://your-whmcs-instance /var/www/path/to/your/whmcs /root/whmcs_v880_full/whmcs`.
 6. The command in step 5 will return a list with issues found in your instance.
 7. If you want to run both a check and an integrity scan for e.g. automation, you can use the `all` option instead of `check` or `integrity`.
 
