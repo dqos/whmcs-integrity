@@ -9,7 +9,7 @@
  * @category   whmcs
  * @package    whmcs-integrity
  * @author     dqos
- * @copyright  2023 dqos
+ * @copyright  2024 dqos
  * @license    https://github.com/dqos/whmcs-integrity/blob/main/LICENSE.md
  * @link       https://github.com/dqos/whmcs-integrity
  */
@@ -18,6 +18,20 @@
 if (php_sapi_name() != 'cli') {
     exit;
 }
+
+ob_start(); // starts output logger, which will log PHP script output in case a webhook needs to be sent
+
+// mainly serves to remove redundant error log (script assumes you have proper logging system setup)
+$deleteList = [
+    '/path/to/the/file.extension',
+];
+
+// Configurable number of days after which to delete the files. In case you want to keep logs.
+$deletionIntervalDays = 14; // You can change this to your preferred number of days
+
+// Toggle the webhook feature (set to true to enable, false to disable)
+$enableWebhook = false; // true/false
+$webhookUrl = 'https://example.com/webhook'; // Replace with your webhook URL
 
 $sourceFiles = [];
 $targetFiles = [];
@@ -91,7 +105,60 @@ if (in_array($argv[1], ['check', 'all'])) {
     }
 }
 
+// Function to delete files
+function deleteFiles($deleteList, $deletionIntervalDays) {
+    $logFile = '/path/to/deletion_log.txt'; // Path to the log file that stores the last deletion timestamp
+    $currentTime = time();
+
+    // Check if the last deletion was more than $deletionIntervalDays ago
+    if (file_exists($logFile)) {
+        $lastDeletionTime = file_get_contents($logFile);
+
+        if (($currentTime - $lastDeletionTime) < ($deletionIntervalDays * 24 * 60 * 60)) {
+            // It's not yet time to delete the files again
+            return;
+        }
+    }
+
+    // Delete files and update the log file
+    foreach ($deleteList as $file) {
+        if (file_exists($file)) {
+            unlink($file);
+            echo "Deleted file $file" . PHP_EOL;
+        }
+    }
+
+    // Update the log with the current time
+    file_put_contents($logFile, $currentTime);
+}
+
+// Function to send webhook
+function sendWebhook($message, $webhookUrl) {
+    $eventId = rand(1, 9999); // Randomly generated ID between 1 and 9999
+
+    $postData = json_encode([
+        'message' => 'Security issues detected on your WHMCS instance',
+        'description' => $message,
+        'status' => 'trigger',
+        'event_id' => $eventId
+    ]);
+
+    $ch = curl_init($webhookUrl);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    return $response;
+}
+
+// Delete files from the delete list
+deleteFiles($deleteList, $deletionIntervalDays);
+
 // Integrity check, creates hashes from WHMCS source folder in order to compare it to your instance;
+
 if (in_array($argv[1], ['integrity', 'all'])) {
     if (!isset($argv[4])) {
         die('Missing param...');
@@ -102,7 +169,6 @@ if (in_array($argv[1], ['integrity', 'all'])) {
     }
 
     $sourceFolder = rtrim($argv[4], '/');
-
     chdir($sourceFolder);
     $directoryIterator = new RecursiveDirectoryIterator(getcwd(), RecursiveDirectoryIterator::SKIP_DOTS);
     foreach (new RecursiveIteratorIterator($directoryIterator) as $file) {
@@ -172,6 +238,7 @@ if (in_array($argv[1], ['integrity', 'all'])) {
 
     foreach ($sourceFiles as $part => $files) {
         foreach ($files as $file => $hash) {
+
             // Ignore default directories, they should be outside your webroot anyway;
             if (preg_match('/install\/|templates_c\/|downloads\/|attachments\//i', $file)) {
                 continue;
@@ -203,6 +270,13 @@ if (in_array($argv[1], ['integrity', 'all'])) {
             }
         }
     }
+}
+
+$output = ob_get_clean(); // starts output logger, which will log PHP script output in case a webhook needs to be sent
+
+// sends a webhook if $output is not empty.
+if ($enableWebhook && !empty($output)) {
+    sendWebhook($output, $webhookUrl);
 }
 
 // Helper function to loop through ignored files/folders;
