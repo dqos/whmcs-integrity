@@ -19,6 +19,7 @@ if (php_sapi_name() != 'cli') {
     exit;
 }
 
+ob_start(); // starts output logger, which will log PHP script output in case a webhook needs to be sent
 
 // mainly serves to remove redundant error log (script assumes you have proper logging system setup)
 $deleteList = [
@@ -27,6 +28,10 @@ $deleteList = [
 
 // Configurable number of days after which to delete the files. In case you want to keep logs.
 $deletionIntervalDays = 14; // You can change this to your preferred number of days
+
+// Toggle the webhook feature (set to true to enable, false to disable)
+$enableWebhook = false; // true/false
+$webhookUrl = 'https://example.com/webhook'; // Replace with your webhook URL
 
 $sourceFiles = [];
 $targetFiles = [];
@@ -125,6 +130,28 @@ function deleteFiles($deleteList, $deletionIntervalDays) {
 
     // Update the log with the current time
     file_put_contents($logFile, $currentTime);
+}
+
+// Function to send webhook
+function sendWebhook($message, $webhookUrl) {
+    $eventId = rand(1, 9999); // Randomly generated ID between 1 and 9999
+
+    $postData = json_encode([
+        'message' => 'Security issues detected on your WHMCS instance',
+        'description' => $message,
+        'status' => 'trigger',
+        'event_id' => $eventId
+    ]);
+
+    $ch = curl_init($webhookUrl);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    return $response;
 }
 
 // Delete files from the delete list
@@ -246,6 +273,11 @@ if (in_array($argv[1], ['integrity', 'all'])) {
 }
 
 $output = ob_get_clean(); // starts output logger, which will log PHP script output in case a webhook needs to be sent
+
+// sends a webhook if $output is not empty.
+if ($enableWebhook && !empty($output)) {
+    sendWebhook($output, $webhookUrl);
+}
 
 // Helper function to loop through ignored files/folders;
 function isIgnored($ignoreList, $file)
