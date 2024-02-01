@@ -30,7 +30,7 @@ We generally do not code software for EOL PHP, but still a lot of providers negl
 3. To use the ignore feature, create a file named `ignore` in the same directory as the `whmcs-integrity.php` script. This file should contain a list of file paths that you want to exclude from the integrity check. Each path should be on a new line. For example:
     ```
     /path/to/ignored/file1.php
-    /path/to/ignored/file2.php
+    /path/to/ignored/folder
     ```
     The script will automatically read this file and exclude these files from being checked for integrity.
 4. Let's do an intial security check by running: `php whmcs-integrity.php check https://your-whmcs-instance-url.com /var/www/path/to/your/whmcs`.
